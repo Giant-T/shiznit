@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define PI 3.14159265
-
 typedef struct {
     double x;
     double y;
@@ -20,7 +18,8 @@ typedef struct {
 
 typedef struct {
     vector_t pos;
-    vector_t direction;
+    double v_angle;
+    double h_angle;
     double distance;
 } camera_t;
 
@@ -77,6 +76,16 @@ boolean initialise_vt(void) {
     return true;
 }
 
+vector_t vec_from_points(const vector_t *p1, const vector_t *p2) {
+    vector_t vec = {
+        .x = p2->x - p1->x,
+        .y = p2->y - p1->y,
+        .z = p2->z - p1->z,
+    };
+
+    return vec;
+}
+
 double vector_len(const vector_t *vec) {
     return sqrt(vec->x * vec->x + vec->y * vec->y + vec->z * vec->z);
 }
@@ -94,24 +103,53 @@ vector_t cross_product(const vector_t *vec1, const vector_t *vec2) {
 double ray_distance(const vector_t *ray, const vector_t *vec) {
     vector_t product = cross_product(ray, vec);
     double numerator = vector_len(&product);
-    double denumerator = vector_len(vec);
+    double denumerator = vector_len(ray);
 
     return numerator / denumerator;
 }
 
-void display(COORD *screen_size, const camera_t *camera, const sphere_t *sphere) {
+vector_t normalize(const vector_t *vec) {
+    double len = vector_len(vec);
+    vector_t normal = {
+        .x = vec->x / len,
+        .y = vec->y / len,
+        .z = vec->z / len,
+    };
+
+    return normal;
+}
+
+// source: https://www.arduino.cc/reference/en/language/functions/math/map/
+double map(double x, double in_min, double in_max, double out_min, double out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+void display(const COORD *screen_size, const camera_t *camera, const sphere_t *sphere) {
+    printf("\x1b[2J");
+
+    if (camera->pos.y + camera->distance > sphere->pos.y) return;
+
+    int half_screen_x = (screen_size->X / 2);
+    int half_screen_y = (screen_size->Y / 2);
+
     for (int screen_y = 1; screen_y < screen_size->Y; screen_y++) {
         for (int screen_x = 1; screen_x < screen_size->X; screen_x++) {
-            vector_t ray = {
-                .x = screen_x - (int)(screen_size->X / 2),
-                .y = camera->distance,
-                .z = screen_y - (int)(screen_size->Y / 2),
+            vector_t screen_point = {
+                .x = screen_x - half_screen_x,
+                .y = camera->pos.y + camera->distance,
+                .z = screen_y - half_screen_y,
             };
 
-            double distance = ray_distance(&ray, &sphere->pos);
+            vector_t ray = vec_from_points(&camera->pos, &screen_point);
 
-            if (distance < sphere->radius) {
+            vector_t vec = vec_from_points(&camera->pos, &sphere->pos);
+            double distance = ray_distance(&ray, &vec);
+
+            double diff = distance - sphere->radius;
+            if (diff < 0) {
                 printf("\x1b[%d;%dH#", screen_y, screen_x);
+            } else if (diff < .5) {
+                printf("\x1b[%d;%dH,", screen_y, screen_x);
             }
         }
     }
@@ -127,19 +165,19 @@ int main(void) {
     CONSOLE_SCREEN_BUFFER_INFO screen_buffer_info;
     GetConsoleScreenBufferInfo(out_handle, &screen_buffer_info);
 
-    COORD size = screen_buffer_info.dwSize;
+    const COORD *size = &screen_buffer_info.dwSize;
     int counter = 0;
 
     const sphere_t sphere = {
         .pos = {
             .x = 0,
             .z = 0,
-            .y = 10,
+            .y = 30,
         },
         .radius = 20,
     };
 
-    const camera_t camera = {
+    camera_t camera = {
         .pos = {
             .x = 0,
             .y = 0,
@@ -149,8 +187,9 @@ int main(void) {
     };
 
     while (1) {
-        display(&size, &camera, &sphere);
-        printf("\x1b[1;1H%d, size: %d, %d", counter++, size.X, size.Y);
+        display(size, &camera, &sphere);
+        printf("\x1b[1;1H%f, size: %d, %d", camera.pos.y, size->X, size->Y);
+        camera.pos.y += 0.25;
         Sleep(500);
     }
 }

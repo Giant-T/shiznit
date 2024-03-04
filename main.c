@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     double x;
@@ -125,9 +126,11 @@ double map(double x, double in_min, double in_max, double out_min, double out_ma
 }
 
 void display(const COORD *screen_size, const camera_t *camera, const sphere_t *sphere) {
-    printf("\x1b[2J");
-
-    if (camera->pos.y + camera->distance > sphere->pos.y) return;
+    size_t commands_size = 1024;
+    char *commands = malloc(commands_size);
+    memset(commands, 0, commands_size);
+    strcpy_s(commands, commands_size, "\x1b[2J");
+    size_t commands_len = strlen(commands);
 
     int half_screen_x = (screen_size->X / 2);
     int half_screen_y = (screen_size->Y / 2);
@@ -146,13 +149,30 @@ void display(const COORD *screen_size, const camera_t *camera, const sphere_t *s
             double distance = ray_distance(&ray, &vec);
 
             double diff = distance - sphere->radius;
+            char command[20];
+            memset(command, 0, 20);
+            int command_len = 0;
             if (diff < 0) {
-                printf("\x1b[%d;%dH#", screen_y, screen_x);
+                sprintf(command, "\x1b[%d;%dH#", screen_y, screen_x);
+                command_len = strlen(command);
             } else if (diff < .5) {
-                printf("\x1b[%d;%dH,", screen_y, screen_x);
+                sprintf(command, "\x1b[%d;%dH,", screen_y, screen_x);
+                command_len = strlen(command);
+            }
+
+            if (command_len) {
+                commands_len += command_len;
+                if (commands_len >= commands_size) {
+                    commands_size *= 2;
+                    commands = realloc(commands, commands_size);
+                }
+                strcat_s(commands, commands_size, command);
             }
         }
     }
+
+    printf("%s", commands);
+    free(commands);
 }
 
 int main(void) {
@@ -180,10 +200,10 @@ int main(void) {
     camera_t camera = {
         .pos = {
             .x = 0,
-            .y = 0,
+            .y = -5,
             .z = 0,
         },
-        .distance = 1,
+        .distance = 5,
     };
 
     while (1) {

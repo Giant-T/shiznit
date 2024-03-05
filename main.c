@@ -177,13 +177,13 @@ void display(const COORD *screen_size, const camera_t *camera, const sphere_t *s
     strcpy_s(commands, commands_size, "\x1b[2J");
     size_t commands_len = strlen(commands);
 
-    int half_screen_x = (screen_size->X / 2);
+    int half_screen_x = (screen_size->X / 4);
     int half_screen_y = (screen_size->Y / 2);
 
     for (int screen_y = 1; screen_y < screen_size->Y; screen_y++) {
         for (int screen_x = 1; screen_x < screen_size->X; screen_x++) {
             vector_t screen_point = {
-                .x = screen_x - half_screen_x,
+                .x = screen_x * 0.5 - half_screen_x,
                 .y = camera->pos.y + camera->distance,
                 .z = screen_y - half_screen_y,
             };

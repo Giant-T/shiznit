@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define F_THRESHOLD 0.000001
+
 typedef struct {
     double x;
     double y;
@@ -28,6 +30,12 @@ unsigned long out_mode = 0;
 HANDLE out_handle;
 unsigned long in_mode = 0;
 HANDLE in_handle;
+
+const vector_t sun = {
+    .x = -0.588348,
+    .y = 0.196116,
+    .z = -0.78446,
+};
 
 void clean_up(int signal) {
     if (signal == SIGINT) {
@@ -101,12 +109,39 @@ vector_t cross_product(const vector_t *vec1, const vector_t *vec2) {
     return product;
 }
 
-double ray_distance(const vector_t *ray, const vector_t *vec) {
-    vector_t product = cross_product(ray, vec);
-    double numerator = vector_len(&product);
-    double denumerator = vector_len(ray);
+double dot_product(const vector_t *vec1, const vector_t *vec2) {
+    return vec1->x * vec2->x + vec1->y * vec2->y + vec1->z * vec2->z;
+}
 
-    return numerator / denumerator;
+vector_t vec_project(const vector_t *vec, const vector_t *onto) {
+    double multiplier = dot_product(vec, onto) / dot_product(onto, onto);
+    vector_t projection = {
+        .x = onto->x * multiplier,
+        .y = onto->y * multiplier,
+        .z = onto->z * multiplier,
+    };
+
+    return projection;
+}
+
+vector_t scalar_multiplication(const vector_t *vec, const double scalar) {
+    vector_t result = {
+        .x = vec->x * scalar,
+        .y = vec->y * scalar,
+        .z = vec->z * scalar,
+    };
+
+    return result;
+}
+
+vector_t vec_add(const vector_t *vec1, const vector_t *vec2) {
+    vector_t result = {
+        .x = vec1->x + vec2->x,
+        .y = vec1->y + vec2->y,
+        .z = vec1->z + vec2->z,
+    };
+
+    return result;
 }
 
 vector_t normalize(const vector_t *vec) {
@@ -120,9 +155,19 @@ vector_t normalize(const vector_t *vec) {
     return normal;
 }
 
-// source: https://www.arduino.cc/reference/en/language/functions/math/map/
-double map(double x, double in_min, double in_max, double out_min, double out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+double ray_distance(const vector_t *ray, const vector_t *vec) {
+    vector_t product = cross_product(ray, vec);
+    double numerator = vector_len(&product);
+    double denumerator = vector_len(ray);
+
+    return numerator / denumerator;
+}
+
+// cosine similarity
+double calc_light(const vector_t *normal) {
+    double numerator = dot_product(&sun, normal);
+    double denumerator = vector_len(&sun) * vector_len(normal);
+    return -numerator / denumerator;
 }
 
 void display(const COORD *screen_size, const camera_t *camera, const sphere_t *sphere) {
@@ -143,25 +188,27 @@ void display(const COORD *screen_size, const camera_t *camera, const sphere_t *s
                 .z = screen_y - half_screen_y,
             };
 
-            vector_t ray = vec_from_points(&camera->pos, &screen_point);
+            const vector_t ray = vec_from_points(&camera->pos, &screen_point);
 
-            vector_t vec = vec_from_points(&camera->pos, &sphere->pos);
-            double distance = ray_distance(&ray, &vec);
+            const vector_t vec = vec_from_points(&camera->pos, &sphere->pos);
+            const double distance = ray_distance(&ray, &vec);
 
             double diff = distance - sphere->radius;
             char command[20];
-            memset(command, 0, 20);
-            int command_len = 0;
-            if (diff < 0) {
-                sprintf(command, "\x1b[%d;%dH#", screen_y, screen_x);
-                command_len = strlen(command);
-            } else if (diff < .5) {
-                sprintf(command, "\x1b[%d;%dH,", screen_y, screen_x);
-                command_len = strlen(command);
-            }
+            if (diff < F_THRESHOLD) {
+                const double x = sqrt(sphere->radius * sphere->radius - distance * distance);
 
-            if (command_len) {
-                commands_len += command_len;
+                const vector_t projection = vec_project(&vec, &ray);
+                const vector_t x_proj = scalar_multiplication(&projection, -x / vector_len(&projection));
+
+                vector_t contact = vec_add(&projection, &x_proj);
+                contact = vec_from_points(&contact, &vec);
+                contact = normalize(&contact);
+
+                char texture = calc_light(&contact) > 0 ? '\'' : '#';
+
+                sprintf(command, "\x1b[%d;%dH%c", screen_y, screen_x, texture);
+                commands_len += strlen(command);
                 if (commands_len >= commands_size) {
                     commands_size *= 2;
                     commands = realloc(commands, commands_size);

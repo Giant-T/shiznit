@@ -1,6 +1,16 @@
+CC=gcc
+CFLAGS=-std=c17 -Wall -pedantic
+OBJFILES=main.o terminal.o
 
-all:
-	gcc main.c -o main -O3
+all: release
 
-debug:
-	gcc main.c -o main -Og -ggdb
+release: CFLAGS += -O3
+release: main
+
+main: $(OBJFILES)
+	@echo Compiling executable...
+	@$(CC) $(CFLAGS) $(OBJFILES) -o main
+
+%.o: src/%.c
+	@echo Compiling $@
+	@$(CC) $(CFLAGS) -c $< -o $@

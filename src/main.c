@@ -1,10 +1,10 @@
-#include <Windows.h>
 #include <math.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "terminal.h"
 
 #define F_THRESHOLD 0.000001
 
@@ -26,64 +26,11 @@ typedef struct {
     double distance;
 } camera_t;
 
-unsigned long out_mode = 0;
-HANDLE out_handle;
-unsigned long in_mode = 0;
-HANDLE in_handle;
-
 const vector_t sun = {
     .x = -0.588348,
     .y = 0.196116,
     .z = -0.78446,
 };
-
-void clean_up(int signal) {
-    if (signal == SIGINT) {
-        SetConsoleMode(out_handle, out_mode);
-        SetConsoleMode(in_handle, in_mode);
-        printf("\x1b[?1049l\x1b[?25h");
-        exit(0);
-    }
-}
-
-boolean initialise_vt(void) {
-    out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    if (out_handle == INVALID_HANDLE_VALUE) {
-        fprintf(stderr, "ERROR: Get stdout failed with %ld\n", GetLastError());
-        return false;
-    }
-
-    if (!GetConsoleMode(out_handle, &out_mode)) {
-        fprintf(stderr, "ERROR: GetConsoleMode of stdout failed with %ld\n", GetLastError());
-        return false;
-    }
-
-    if (!SetConsoleMode(out_handle, out_mode | ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
-        fprintf(stderr, "ERROR: SetConsoleMode of stdout failed with %ld\n", GetLastError());
-        return false;
-    }
-
-    in_handle = GetStdHandle(STD_INPUT_HANDLE);
-
-    if (in_handle == INVALID_HANDLE_VALUE) {
-        fprintf(stderr, "ERROR: Get stdin failed with %ld\n", GetLastError());
-        return false;
-    }
-
-    if (!GetConsoleMode(in_handle, &in_mode)) {
-        fprintf(stderr, "ERROR: GetConsoleMode of stdin failed with %ld\n", GetLastError());
-        return false;
-    }
-
-    if (!SetConsoleMode(in_handle, in_mode | ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT)) {
-        fprintf(stderr, "ERROR: SetConsoleMode of stdin failed with %ld\n", GetLastError());
-        return false;
-    }
-
-    printf("\x1b[?1049h\x1b[?25l");
-    return true;
-}
 
 vector_t vec_from_points(const vector_t *p1, const vector_t *p2) {
     vector_t vec = {
@@ -170,18 +117,18 @@ double calc_light(const vector_t *normal) {
     return -numerator / denumerator;
 }
 
-void display(const COORD *screen_size, const camera_t *camera, const sphere_t *sphere) {
+void display(const term_size_t *screen_size, const camera_t *camera, const sphere_t *sphere) {
     size_t commands_size = 1024;
     char *commands = malloc(commands_size);
     memset(commands, 0, commands_size);
     strcpy_s(commands, commands_size, "\x1b[2J");
     size_t commands_len = strlen(commands);
 
-    int half_screen_x = (screen_size->X / 4);
-    int half_screen_y = (screen_size->Y / 2);
+    int half_screen_x = (screen_size->x / 4);
+    int half_screen_y = (screen_size->y / 2);
 
-    for (int screen_y = 1; screen_y < screen_size->Y; screen_y++) {
-        for (int screen_x = 1; screen_x < screen_size->X; screen_x++) {
+    for (int screen_y = 1; screen_y < screen_size->y; screen_y++) {
+        for (int screen_x = 1; screen_x < screen_size->x; screen_x++) {
             vector_t screen_point = {
                 .x = screen_x * 0.5 - half_screen_x,
                 .y = camera->pos.y + camera->distance,
@@ -223,17 +170,9 @@ void display(const COORD *screen_size, const camera_t *camera, const sphere_t *s
 }
 
 int main(void) {
-    boolean initialised = initialise_vt();
+    initialize_terminal();
 
-    if (!initialised) return 1;
-
-    signal(SIGINT, clean_up);
-
-    CONSOLE_SCREEN_BUFFER_INFO screen_buffer_info;
-    GetConsoleScreenBufferInfo(out_handle, &screen_buffer_info);
-
-    const COORD *size = &screen_buffer_info.dwSize;
-    int counter = 0;
+    const term_size_t size = get_term_size();
 
     const sphere_t sphere = {
         .pos = {
@@ -254,9 +193,9 @@ int main(void) {
     };
 
     while (1) {
-        display(size, &camera, &sphere);
-        printf("\x1b[1;1H%f, size: %d, %d", camera.pos.y, size->X, size->Y);
+        display(&size, &camera, &sphere);
+        printf("\x1b[1;1H%f, size: %d, %d", camera.pos.y, size.x, size.y);
         camera.pos.y += 0.25;
-        Sleep(500);
+        wait(500);
     }
 }

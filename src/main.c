@@ -1,5 +1,4 @@
 #include <math.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,7 +140,7 @@ void display(const term_size_t *screen_size, const camera_t *camera, const spher
             const double distance = ray_distance(&ray, &vec);
 
             double diff = distance - sphere->radius;
-            char command[20];
+            char command[30];
             if (diff < F_THRESHOLD) {
                 const double x = sqrt(sphere->radius * sphere->radius - distance * distance);
 
@@ -149,10 +148,10 @@ void display(const term_size_t *screen_size, const camera_t *camera, const spher
                 const vector_t x_proj = scalar_multiplication(&projection, -x / vector_len(&projection));
 
                 vector_t contact = vec_add(&projection, &x_proj);
-                contact = vec_from_points(&contact, &vec);
-                contact = normalize(&contact);
+                vector_t normal = vec_from_points(&contact, &vec);
+                normal = normalize(&normal);
 
-                char texture = calc_light(&contact) > 0 ? '\'' : '#';
+                char texture = calc_light(&normal) > 0 ? '#' : '\'';
 
                 sprintf(command, "\x1b[%d;%dH%c", screen_y, screen_x, texture);
                 commands_len += strlen(command);

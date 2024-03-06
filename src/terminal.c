@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 
@@ -89,7 +90,7 @@ bool initialize_terminal() {
     return true;
 }
 
-void clean_up() {
+void clean_up(int signal) {
     if (signal == SIGINT) {
         printf("\x1b[?1049l\x1b[?25h");
         exit(0);
@@ -109,7 +110,7 @@ term_size_t get_term_size() {
 }
 
 void wait(int millisec) {
-    sleep(millisec / 1000);
+    usleep(millisec);
 }
 
 #endif

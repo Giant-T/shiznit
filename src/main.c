@@ -170,7 +170,7 @@ void display(const term_size_t *screen_size, const camera_t *camera, const spher
 }
 
 int main(void) {
-    initialize_terminal();
+    if (!initialize_terminal()) return 1;
 
     const term_size_t size = get_term_size();
 

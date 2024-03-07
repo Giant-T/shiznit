@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-std=c17 -Wall -pedantic
-OBJFILES=main.o terminal.o
+OBJFILES=main.o terminal.o vector.o
 
 all: release
 

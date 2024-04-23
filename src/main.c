@@ -30,7 +30,7 @@ void display(const term_size_t *screen_size, const camera_t *camera, const spher
     size_t commands_size = 1024;
     char *commands = malloc(commands_size);
     memset(commands, 0, commands_size);
-    strcpy_s(commands, commands_size, "\x1b[2J");
+    strcpy(commands, "\x1b[2J");
     size_t commands_len = strlen(commands);
 
     int half_screen_x = (screen_size->x / 4);
@@ -69,7 +69,7 @@ void display(const term_size_t *screen_size, const camera_t *camera, const spher
                     commands_size *= 2;
                     commands = realloc(commands, commands_size);
                 }
-                strcat_s(commands, commands_size, command);
+                strcat(commands, command);
             }
         }
     }

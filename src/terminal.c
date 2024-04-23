@@ -83,6 +83,7 @@ void wait(int millisec) {
 #elif __linux__
 
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
 
 bool initialize_terminal() {
@@ -93,7 +94,6 @@ bool initialize_terminal() {
 void clean_up(int signal) {
     if (signal == SIGINT) {
         printf("\x1b[?1049l\x1b[?25h");
-        exit(0);
     }
 }
 
@@ -102,7 +102,7 @@ term_size_t get_term_size() {
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
 
     term_size_t size = {
-        .x = w.ws_row,
+        .x = w.ws_col,
         .y = w.ws_col,
     };
 
@@ -110,7 +110,12 @@ term_size_t get_term_size() {
 }
 
 void wait(int millisec) {
-    usleep(millisec);
+    struct timespec reqtime = {
+        .tv_sec = 0,
+        .tv_nsec = 1000000 * millisec,
+    };
+
+    nanosleep(&reqtime, NULL);
 }
 
 #endif
